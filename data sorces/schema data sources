@@ -1,0 +1,40 @@
+Surse de date 
+DS1 - CSV-uri - Payments System - import in Postgres - SQL
+
+- cards
+- card_limits
+- card_security
+- transactions
+- merchants
+
+Chei interne:
+
+cards.card_id = card_limits.card_id
+
+cards.card_id = card_security.card_id
+
+transactions.card_id → cards.card_id
+
+transactions.merchant_id → merchants.merchant_id
+
+---
+
+DS2 - Excel - Customers
+- customers
+- customer_finance
+
+DS3 - JSON - Risk/Fraud Analysis - MongoDB NoSQL
+
+transaction_docs
+customer_risk_docs
+
+
+DS_2 (CRM XLS)
+     client_id
+          │
+          ▼
+DS_1 (CSV Payments -> Postgres - SQL)
+     cards → transactions
+          │
+          ▼
+DS_3 (JSON Risk Docs -> MongoDB - NoSQL)
