@@ -235,3 +235,254 @@ SELECT
 FROM INT_TRANSACTIONS_BASE_V;
 
 SELECT * FROM FACT_TRANSACTIONS_V;
+
+################### Analytical Views #############################
+
+--Să se analizeze valoarea totală a tranzacțiilor pe structură calendaristică ierarhică, la nivel de an, lună și zi, incluzând subtotaluri pe lună, pe an și total general.
+
+CREATE OR REPLACE VIEW OLAP_VIEW_TXN_CALENDAR_V AS
+SELECT
+    CASE
+        WHEN GROUPING(t.txn_year) = 1 THEN '{TOTAL_GENERAL}'
+        ELSE TO_CHAR(t.txn_year)
+    END AS txn_year,
+    CASE
+        WHEN GROUPING(t.txn_year) = 1 THEN ' '
+        WHEN GROUPING(t.txn_month) = 1 THEN 'subtotal year ' || TO_CHAR(t.txn_year)
+        ELSE TO_CHAR(t.txn_month)
+    END AS txn_month,
+    CASE
+        WHEN GROUPING(t.txn_year) = 1 THEN ' '
+        WHEN GROUPING(t.txn_month) = 1 THEN ' '
+        WHEN GROUPING(t.txn_day) = 1 THEN 'subtotal month ' || TO_CHAR(t.txn_month)
+        ELSE TO_CHAR(t.txn_day)
+    END AS txn_day,
+    SUM(NVL(f.amount, 0)) AS total_amount
+FROM DIM_TIME_V t
+LEFT JOIN FACT_TRANSACTIONS_V f
+    ON t.txn_date = f.txn_date
+GROUP BY ROLLUP(t.txn_year, t.txn_month, t.txn_day)
+ORDER BY t.txn_year, t.txn_month, t.txn_day;
+
+select * from OLAP_VIEW_TXN_CALENDAR_V;
+
+--Să se analizeze suma totală a tranzacțiilor în funcție de zona geografică a comerciantului, la nivel de stat și oraș, cu subtotal pe stat și total general.
+CREATE OR REPLACE VIEW OLAP_VIEW_TXN_MERCHANT_GEO_V AS
+SELECT
+    CASE
+        WHEN GROUPING(g.state_group) = 1 THEN '{TOTAL_GENERAL}'
+        ELSE g.state_group
+    END AS state_group,
+    CASE
+        WHEN GROUPING(g.state_group) = 1 THEN ' '
+        WHEN GROUPING(g.city_group) = 1 THEN 'subtotal state ' || g.state_group
+        ELSE g.city_group
+    END AS city_group,
+    SUM(NVL(f.amount, 0)) AS total_amount
+FROM DIM_MERCHANT_GEO_V g
+LEFT JOIN FACT_TRANSACTIONS_V f
+    ON g.merchant_id = f.merchant_id
+GROUP BY ROLLUP(g.state_group, g.city_group)
+ORDER BY g.state_group, g.city_group;
+
+select * from OLAP_VIEW_TXN_MERCHANT_GEO_V;
+
+--Să se analizeze valoarea totală a tranzacțiilor în funcție de grupa de scor de credit și grupa de vârstă a clienților, cu subtotaluri pe fiecare categorie de scor de credit.
+CREATE OR REPLACE VIEW OLAP_VIEW_TXN_CREDIT_AGE_V AS
+SELECT
+    CASE
+        WHEN GROUPING(c.credit_score_group) = 1 THEN '{TOTAL_GENERAL}'
+        ELSE c.credit_score_group
+    END AS credit_score_group,
+    CASE
+        WHEN GROUPING(c.credit_score_group) = 1 THEN ' '
+        WHEN GROUPING(c.age_group) = 1 THEN 'subtotal score ' || c.credit_score_group
+        ELSE c.age_group
+    END AS age_group,
+    SUM(NVL(f.amount, 0)) AS total_amount
+FROM DIM_CLIENT_V c
+LEFT JOIN FACT_TRANSACTIONS_V f
+    ON c.client_id = f.client_id
+GROUP BY ROLLUP(c.credit_score_group, c.age_group)
+ORDER BY c.credit_score_group, c.age_group;
+
+select * from OLAP_VIEW_TXN_CREDIT_AGE_V;
+
+---Să se analizeze totalul tranzacțiilor pe baza caracteristicilor cardului, la nivel de brand de card și tip de card, cu subtotal pe brand și total general.
+CREATE OR REPLACE VIEW OLAP_VIEW_TXN_CARD_BRAND_TYPE_V AS
+SELECT
+    CASE
+        WHEN GROUPING(c.card_brand) = 1 THEN '{TOTAL_GENERAL}'
+        ELSE c.card_brand
+    END AS card_brand,
+    CASE
+        WHEN GROUPING(c.card_brand) = 1 THEN ' '
+        WHEN GROUPING(c.card_type) = 1 THEN 'subtotal brand ' || c.card_brand
+        ELSE c.card_type
+    END AS card_type,
+    SUM(NVL(f.amount, 0)) AS total_amount
+FROM DIM_CARD_V c
+LEFT JOIN FACT_TRANSACTIONS_V f
+    ON c.card_id = f.card_id
+GROUP BY ROLLUP(c.card_brand, c.card_type)
+ORDER BY c.card_brand, c.card_type;
+
+select * from OLAP_VIEW_TXN_CARD_BRAND_TYPE_V;
+
+---Să se determine valoarea totală și numărul tranzacțiilor în funcție de sistemul sursă și canalul de proveniență, incluzând subtotaluri pe sursă și total general.
+CREATE OR REPLACE VIEW OLAP_VIEW_TXN_SOURCE_CHANNEL_V AS
+SELECT
+    CASE
+        WHEN GROUPING(source_system) = 1 THEN '{TOTAL_GENERAL}'
+        ELSE source_system
+    END AS source_system,
+    CASE
+        WHEN GROUPING(source_system) = 1 THEN ' '
+        WHEN GROUPING(channel) = 1 THEN 'subtotal source ' || source_system
+        ELSE NVL(channel, 'NO_CHANNEL')
+    END AS channel,
+    SUM(NVL(amount, 0)) AS total_amount,
+    COUNT(*) AS txn_count
+FROM FACT_TRANSACTIONS_V
+GROUP BY ROLLUP(source_system, channel)
+ORDER BY source_system, channel;
+
+select * from OLAP_VIEW_TXN_SOURCE_CHANNEL_V;
+
+---Să se realizeze o analiză multidimensională de tip CUBE asupra tranzacțiilor după statul comerciantului și brandul cardului, astfel încât să fie obținute toate combinațiile posibile de agregare, inclusiv totalurile generale.
+CREATE OR REPLACE VIEW OLAP_VIEW_TXN_STATE_BRAND_CUBE_V AS
+SELECT
+    CASE
+        WHEN GROUPING(g.state_group) = 1 THEN '{ALL_STATES}'
+        ELSE g.state_group
+    END AS state_group,
+    CASE
+        WHEN GROUPING(c.card_brand) = 1 THEN '{ALL_BRANDS}'
+        ELSE c.card_brand
+    END AS card_brand,
+    SUM(NVL(f.amount, 0)) AS total_amount,
+    COUNT(*) AS txn_count
+FROM FACT_TRANSACTIONS_V f
+LEFT JOIN DIM_MERCHANT_GEO_V g
+    ON f.merchant_id = g.merchant_id
+LEFT JOIN DIM_CARD_V c
+    ON f.card_id = c.card_id
+GROUP BY CUBE(g.state_group, c.card_brand)
+ORDER BY g.state_group, c.card_brand;
+
+select * from OLAP_VIEW_TXN_STATE_BRAND_CUBE_V;
+
+---Să se analizeze valoarea totală și numărul tranzacțiilor în funcție de grupa de venit și grupa de datorie a clientului, cu subtotaluri pe fiecare categorie de venit.
+CREATE OR REPLACE VIEW OLAP_VIEW_TXN_INCOME_DEBT_V AS
+SELECT
+    CASE
+        WHEN GROUPING(c.income_group) = 1 THEN '{TOTAL_GENERAL}'
+        ELSE c.income_group
+    END AS income_group,
+    CASE
+        WHEN GROUPING(c.income_group) = 1 THEN ' '
+        WHEN GROUPING(c.debt_group) = 1 THEN 'subtotal income ' || c.income_group
+        ELSE c.debt_group
+    END AS debt_group,
+    SUM(NVL(f.amount, 0)) AS total_amount,
+    COUNT(*) AS txn_count
+FROM DIM_CLIENT_V c
+LEFT JOIN FACT_TRANSACTIONS_V f
+    ON c.client_id = f.client_id
+GROUP BY ROLLUP(c.income_group, c.debt_group)
+ORDER BY c.income_group, c.debt_group;
+
+select * from OLAP_VIEW_TXN_INCOME_DEBT_V;
+
+--Să se realizeze o analiză de tip CUBE asupra tranzacțiilor după statusul cipului cardului și statusul de risc dark web, calculând suma totală, numărul tranzacțiilor și valoarea medie.
+CREATE OR REPLACE VIEW OLAP_VIEW_TXN_CARD_SECURITY_CUBE_V AS
+SELECT
+    CASE
+        WHEN GROUPING(c.chip_group) = 1 THEN '{ALL_CHIP_STATUS}'
+        ELSE c.chip_group
+    END AS chip_group,
+    CASE
+        WHEN GROUPING(c.darkweb_group) = 1 THEN '{ALL_RISK_STATUS}'
+        ELSE c.darkweb_group
+    END AS darkweb_group,
+    SUM(NVL(f.amount, 0)) AS total_amount,
+    COUNT(*) AS txn_count,
+    ROUND(AVG(NVL(f.amount, 0)), 2) AS avg_amount
+FROM FACT_TRANSACTIONS_V f
+LEFT JOIN DIM_CARD_V c
+    ON f.card_id = c.card_id
+GROUP BY CUBE(c.chip_group, c.darkweb_group)
+ORDER BY c.chip_group, c.darkweb_group;
+
+select * from OLAP_VIEW_TXN_CARD_SECURITY_CUBE_V;
+
+--Să se analizeze tranzacțiile prin GROUPING SETS la nivel de an, stat și sistem sursă, pentru a obține separat agregări pe an, pe an-stat, pe an-stat-sursă și total general.
+CREATE OR REPLACE VIEW OLAP_VIEW_TXN_YEAR_STATE_SOURCE_GSETS_V AS
+SELECT
+    CASE
+        WHEN GROUPING(t.txn_year) = 1 THEN '{TOTAL_GENERAL}'
+        ELSE TO_CHAR(t.txn_year)
+    END AS txn_year,
+    CASE
+        WHEN GROUPING(t.txn_year) = 1 THEN ' '
+        WHEN GROUPING(g.state_group) = 1 THEN 'subtotal year ' || TO_CHAR(t.txn_year)
+        ELSE g.state_group
+    END AS state_group,
+    CASE
+        WHEN GROUPING(t.txn_year) = 1 THEN ' '
+        WHEN GROUPING(g.state_group) = 1 THEN ' '
+        WHEN GROUPING(f.source_system) = 1 THEN 'subtotal state ' || g.state_group
+        ELSE f.source_system
+    END AS source_system,
+    SUM(NVL(f.amount, 0)) AS total_amount,
+    COUNT(*) AS txn_count
+FROM FACT_TRANSACTIONS_V f
+LEFT JOIN DIM_TIME_V t
+    ON f.txn_date = t.txn_date
+LEFT JOIN DIM_MERCHANT_GEO_V g
+    ON f.merchant_id = g.merchant_id
+GROUP BY GROUPING SETS (
+    (t.txn_year),
+    (t.txn_year, g.state_group),
+    (t.txn_year, g.state_group, f.source_system),
+    ()
+)
+ORDER BY 1, 2, 3;
+
+select * from OLAP_VIEW_TXN_YEAR_STATE_SOURCE_GSETS_V;
+
+--Să se analizeze tranzacțiile prin GROUPING SETS la nivel de lună, grupă de venit și cod MCC, calculând suma totală, numărul de tranzacții și valoarea medie, împreună cu subtotaluri și total general.
+CREATE OR REPLACE VIEW OLAP_VIEW_TXN_MONTH_INCOME_MCC_GSETS_V AS
+SELECT
+    CASE
+        WHEN GROUPING(t.txn_month) = 1 THEN '{TOTAL_GENERAL}'
+        ELSE TO_CHAR(t.txn_month)
+    END AS txn_month,
+    CASE
+        WHEN GROUPING(t.txn_month) = 1 THEN ' '
+        WHEN GROUPING(c.income_group) = 1 THEN 'subtotal month ' || TO_CHAR(t.txn_month)
+        ELSE c.income_group
+    END AS income_group,
+    CASE
+        WHEN GROUPING(t.txn_month) = 1 THEN ' '
+        WHEN GROUPING(c.income_group) = 1 THEN ' '
+        WHEN GROUPING(f.mcc) = 1 THEN 'subtotal income ' || c.income_group
+        ELSE TO_CHAR(f.mcc)
+    END AS mcc,
+    SUM(NVL(f.amount, 0)) AS total_amount,
+    COUNT(*) AS txn_count,
+    ROUND(AVG(NVL(f.amount, 0)), 2) AS avg_amount
+FROM FACT_TRANSACTIONS_V f
+LEFT JOIN DIM_TIME_V t
+    ON f.txn_date = t.txn_date
+LEFT JOIN DIM_CLIENT_V c
+    ON f.client_id = c.client_id
+GROUP BY GROUPING SETS (
+    (t.txn_month),
+    (t.txn_month, c.income_group),
+    (t.txn_month, c.income_group, f.mcc),
+    ()
+)
+ORDER BY 1, 2, 3;
+
+select * from OLAP_VIEW_TXN_MONTH_INCOME_MCC_GSETS_V;
