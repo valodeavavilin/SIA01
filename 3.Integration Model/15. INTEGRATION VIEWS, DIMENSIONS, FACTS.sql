@@ -486,3 +486,196 @@ GROUP BY GROUPING SETS (
 ORDER BY 1, 2, 3;
 
 select * from OLAP_VIEW_TXN_MONTH_INCOME_MCC_GSETS_V;
+
+--Running total pe client în timp
+CREATE OR REPLACE VIEW WV_TXN_RUNNING_TOTAL_CLIENT_V AS
+SELECT
+    f.client_id,
+    f.txn_date,
+    f.txn_id,
+    f.amount,
+    SUM(f.amount) OVER (
+        PARTITION BY f.client_id
+        ORDER BY f.txn_date, f.txn_id
+        ROWS UNBOUNDED PRECEDING
+    ) AS running_total_client
+FROM FACT_TRANSACTIONS_V f;
+
+select * from WV_TXN_RUNNING_TOTAL_CLIENT_V;
+
+--Medie pe client + abaterea față de medie
+CREATE OR REPLACE VIEW WV_TXN_CLIENT_AVG_DIFF_V AS
+SELECT
+    f.client_id,
+    f.txn_id,
+    f.txn_date,
+    f.amount,
+    ROUND(
+        AVG(f.amount) OVER (
+            PARTITION BY f.client_id
+        ),
+        2
+    ) AS avg_amount_per_client,
+    ROUND(
+        f.amount - AVG(f.amount) OVER (
+            PARTITION BY f.client_id
+        ),
+        2
+    ) AS diff_from_client_avg
+FROM FACT_TRANSACTIONS_V f;
+
+SELECT * FROM WV_TXN_CLIENT_AVG_DIFF_V;
+
+
+--Ranking carduri după totalul tranzacționat
+CREATE OR REPLACE VIEW WV_CARD_TOTAL_RANK_V AS
+SELECT
+    x.card_id,
+    x.total_amount,
+    RANK() OVER (ORDER BY x.total_amount DESC)        AS rank_card,
+    DENSE_RANK() OVER (ORDER BY x.total_amount DESC)  AS dense_rank_card,
+    ROW_NUMBER() OVER (ORDER BY x.total_amount DESC)  AS row_number_card
+FROM (
+    SELECT
+        f.card_id,
+        SUM(f.amount) AS total_amount
+    FROM FACT_TRANSACTIONS_V f
+    GROUP BY f.card_id
+) x;
+
+SELECT * FROM WV_CARD_TOTAL_RANK_V;
+
+--Ponderea tranzacției în totalul lunii + running total lunar
+CREATE OR REPLACE VIEW WV_TXN_MONTH_SHARE_RUNNING_V AS
+SELECT
+    t.txn_year,
+    t.txn_month,
+    f.txn_date,
+    f.txn_id,
+    f.client_id,
+    f.amount,
+    SUM(f.amount) OVER (
+        PARTITION BY t.txn_year, t.txn_month
+    ) AS total_month_amount,
+    ROUND(
+        100 * f.amount / SUM(f.amount) OVER (
+            PARTITION BY t.txn_year, t.txn_month
+        ),
+        2
+    ) AS pct_of_month_total,
+    SUM(f.amount) OVER (
+        PARTITION BY t.txn_year, t.txn_month
+        ORDER BY f.txn_date, f.txn_id
+        ROWS UNBOUNDED PRECEDING
+    ) AS running_total_month
+FROM FACT_TRANSACTIONS_V f
+JOIN DIM_TIME_V t
+    ON f.txn_date = t.txn_date;
+    
+SELECT * FROM WV_TXN_MONTH_SHARE_RUNNING_V;
+
+--First / last transaction value pe client + top tranzacții per client
+CREATE OR REPLACE VIEW WV_TXN_CLIENT_FIRST_LAST_TOP_V AS
+SELECT
+    f.client_id,
+    f.txn_date,
+    f.txn_id,
+    f.amount,
+    FIRST_VALUE(f.amount) OVER (
+        PARTITION BY f.client_id
+        ORDER BY f.txn_date, f.txn_id
+    ) AS first_amount_client,
+    LAST_VALUE(f.amount) OVER (
+        PARTITION BY f.client_id
+        ORDER BY f.txn_date, f.txn_id
+        ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING
+    ) AS last_amount_client,
+    ROW_NUMBER() OVER (
+        PARTITION BY f.client_id
+        ORDER BY f.amount DESC, f.txn_date, f.txn_id
+    ) AS top_txn_rank_per_client
+FROM FACT_TRANSACTIONS_V f;
+
+SELECT * FROM WV_TXN_CLIENT_FIRST_LAST_TOP_V;
+
+--Ranking vanzatorilor în interiorul fiecărui stat
+CREATE OR REPLACE VIEW WV_MERCHANT_STATE_RANK_V AS
+SELECT
+    x.state_group,
+    x.city_group,
+    x.merchant_id,
+    x.total_amount,
+    x.txn_count,
+    RANK() OVER (
+        PARTITION BY x.state_group
+        ORDER BY x.total_amount DESC
+    ) AS rank_in_state,
+    DENSE_RANK() OVER (
+        PARTITION BY x.state_group
+        ORDER BY x.total_amount DESC
+    ) AS dense_rank_in_state,
+    ROW_NUMBER() OVER (
+        PARTITION BY x.state_group
+        ORDER BY x.total_amount DESC, x.merchant_id
+    ) AS row_number_in_state
+FROM (
+    SELECT
+        g.state_group,
+        g.city_group,
+        f.merchant_id,
+        SUM(f.amount) AS total_amount,
+        COUNT(*) AS txn_count
+    FROM FACT_TRANSACTIONS_V f
+    JOIN DIM_MERCHANT_GEO_V g
+        ON f.merchant_id = g.merchant_id
+    GROUP BY
+        g.state_group,
+        g.city_group,
+        f.merchant_id
+) x;
+
+select * from WV_MERCHANT_STATE_RANK_V;
+
+--Performanța grupelor de credit score pe luni
+CREATE OR REPLACE VIEW WV_CREDIT_MONTH_PERFORMANCE_V AS
+SELECT
+    x.txn_year,
+    x.txn_month,
+    x.credit_score_group,
+    x.total_amount,
+    x.txn_count,
+    ROUND(
+        AVG(x.total_amount) OVER (
+            PARTITION BY x.credit_score_group
+        ),
+        2
+    ) AS avg_total_per_score_group,
+    SUM(x.total_amount) OVER (
+        PARTITION BY x.txn_year, x.txn_month
+    ) AS total_month_amount,
+    ROUND(
+        100 * x.total_amount /
+        SUM(x.total_amount) OVER (
+            PARTITION BY x.txn_year, x.txn_month
+        ),
+        2
+    ) AS pct_of_month_total
+FROM (
+    SELECT
+        t.txn_year,
+        t.txn_month,
+        c.credit_score_group,
+        SUM(f.amount) AS total_amount,
+        COUNT(*) AS txn_count
+    FROM FACT_TRANSACTIONS_V f
+    JOIN DIM_CLIENT_V c
+        ON f.client_id = c.client_id
+    JOIN DIM_TIME_V t
+        ON f.txn_date = t.txn_date
+    GROUP BY
+        t.txn_year,
+        t.txn_month,
+        c.credit_score_group
+) x;
+
+select * from WV_CREDIT_MONTH_PERFORMANCE_V;
