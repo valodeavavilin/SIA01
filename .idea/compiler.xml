@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <annotationProcessing>
+      <profile default="true" name="Default" enabled="true" />
+      <profile name="Maven default annotation processors profile" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <module name="DSA-DOC-XLSService" />
+        <module name="DSA-SQL-JDBCService" />
+        <module name="DSA-DOC-XMLService" />
+        <module name="DSA-DOC-CSVService" />
+        <module name="DSA-SparkSQL-Service" />
+        <module name="DSA-SQL-JPAService" />
+      </profile>
+    </annotationProcessing>
+  </component>
+  <component name="JavacSettings">
+    <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="DSA-DOC-CSVService" options="-parameters" />
+      <module name="DSA-DOC-XLSService" options="-parameters" />
+      <module name="DSA-DOC-XMLService" options="-parameters" />
+      <module name="DSA-SQL-JDBCService" options="-parameters" />
+      <module name="DSA-SQL-JPAService" options="-parameters" />
+      <module name="DSA-SparkSQL-Service" options="-parameters" />
+    </option>
+  </component>
+</project>
