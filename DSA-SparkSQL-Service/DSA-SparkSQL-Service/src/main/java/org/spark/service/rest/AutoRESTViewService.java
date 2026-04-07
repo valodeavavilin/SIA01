@@ -5,6 +5,7 @@ import org.apache.spark.sql.Row;
 import org.spark.service.SparkSQLService;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.logging.Logger;
 
 /*	REST Service URL:
@@ -12,7 +13,8 @@ import java.util.logging.Logger;
 	http://localhost:9990/DSA-SparkSQL-Service/rest/STRUCT/{VIEW_NAME}
 	http://localhost:9990/DSA-SparkSQL-Service/rest/ping
  */
-@RestController @RequestMapping("/rest")
+@RestController
+@RequestMapping("/rest")
 public class AutoRESTViewService {
     private static Logger logger = Logger.getLogger(AutoRESTViewService.class.getName());
     //
@@ -71,13 +73,12 @@ public class AutoRESTViewService {
 	http://localhost:9990/DSA-SparkSQL-Service/rest/view/{VIEW_NAME}
 
 	* Data Source: SQL JDBC PostgreSQL
-	http://localhost:9990/DSA-SparkSQL-Service/rest/view/customers_view
-	http://localhost:9990/DSA-SparkSQL-Service/rest/view/customers_details_view
-	http://localhost:9990/DSA-SparkSQL-Service/rest/view/customers_addresses_view
+	http://localhost:8090/DSA-SQL-JDBCService/rest/payments/CardLimitsView
+	http://localhost:8090/DSA-SQL-JDBCService/rest/payments/CardSecurityView
+	http://localhost:8090/DSA-SQL-JDBCService/rest/payments/TransactionsView
 	* Data Source: SQ: JPA Oracle
-	http://localhost:9990/DSA-SparkSQL-Service/rest/view/sales_view
-	http://localhost:9990/DSA-SparkSQL-Service/rest/view/products_view
-	http://localhost:9990/DSA-SparkSQL-Service/rest/view/invoices_view
+	http://localhost:8091/DSA_SQL_JPAService/rest/cards/CardJpaView
+	http://localhost:8091/DSA_SQL_JPAService/rest/cards/MerchantJpaView
     * Data Source: XML.DOC
 	http://localhost:9990/DSA-SparkSQL-Service/rest/view/departaments_view
 	http://localhost:9990/DSA-SparkSQL-Service/rest/view/cities_view
