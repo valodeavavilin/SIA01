@@ -1,0 +1,5 @@
+curl -i -X POST --user FDBO:fdbo --data "select sysdate from dual" -H "Content-Type: application/sql" http://localhost:8080/ords/fdbo/_/sql
+
+curl -i -X POST --user FDBO:fdbo --data "select * from OLAP_VIEW_TXN_CREDIT_AGE_V" -H "Content-Type: application/sql" http://localhost:8080/ords/fdbo/_/sql
+
+curl -i -X POST --user FDBO:fdbo --data "select * from FACT_TRANSACTIONS_V where rownum <= 10" -H "Content-Type: application/sql" http://localhost:8080/ords/fdbo/_/sql

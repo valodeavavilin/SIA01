@@ -1,0 +1,48 @@
+SHOW CON_NAME;
+ALTER SESSION SET CONTAINER = XEPDB1;
+SHOW CON_NAME;
+---
+-- === Run as SYS on XEPDB1 ===
+
+-- (optional) drop existing
+BEGIN
+  EXECUTE IMMEDIATE 'DROP USER FDBO CASCADE';
+EXCEPTION WHEN OTHERS THEN NULL;
+END;
+/
+
+CREATE USER FDBO IDENTIFIED BY fdbo
+DEFAULT TABLESPACE users
+TEMPORARY TABLESPACE temp
+QUOTA UNLIMITED ON USERS;
+
+GRANT CONNECT, RESOURCE TO FDBO;
+GRANT CREATE VIEW TO FDBO;
+GRANT CREATE DATABASE LINK TO FDBO;
+
+-- for REST/HTTP + JSON processing
+GRANT CREATE ANY DIRECTORY TO FDBO;
+GRANT EXECUTE ON UTL_HTTP TO FDBO;
+GRANT EXECUTE ON DBMS_LOB TO FDBO;
+
+-- (optional: ExcelTable / crypto)
+GRANT EXECUTE ON SYS.DBMS_CRYPTO TO FDBO;
+
+-- (optional: APEX-ish)
+GRANT CREATE DIMENSION, CREATE JOB, CREATE MATERIALIZED VIEW, CREATE SYNONYM TO FDBO;
+
+-- Allow outbound HTTP (needed when Oracle calls REST endpoints)
+BEGIN
+  DBMS_NETWORK_ACL_ADMIN.APPEND_HOST_ACE (
+      host       => '*',
+      lower_port => NULL,
+      upper_port => NULL,
+      ace        => XS$ACE_TYPE(
+                      privilege_list => XS$NAME_LIST('http'),
+                      principal_name => 'FDBO',
+                      principal_type => XS_ACL.PTYPE_DB
+                    )
+  );
+END;
+/
+COMMIT;

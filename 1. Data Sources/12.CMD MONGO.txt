@@ -1,0 +1,21 @@
+mongod --version
+mongoimport --version
+mongosh
+use mds
+
+show dbs
+mongoimport --db mds --collection customer_risk_docs --file "C:\Users\savas\OneDrive\Desktop\FEAA MASTER\ANUL 2\SEM 2\SII\Proiect\surse de date\mongo - json\customer_risk_docs.jsonl"
+mongoimport --db mds --collection transaction_docs --file "C:\Users\savas\OneDrive\Desktop\FEAA MASTER\ANUL 2\SEM 2\SII\Proiect\surse de date\mongo - json\transaction_docs.jsonl"
+mongosh
+use mds
+show collections
+db.customer_risk_docs.countDocuments()
+db.transaction_docs.countDocuments()
+
+cd C:\Users\savas\restheart\restheart
+
+java -jar restheart.jar -o conf-override.conf
+
+http://localhost:8081/mds
+http://localhost:8081/mds/customer_risk_docs
+http://localhost:8081/mds/transaction_docs

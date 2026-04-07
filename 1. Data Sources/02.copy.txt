@@ -1,0 +1,5 @@
+\copy payments.stg_cards FROM 'path\cards.csv' WITH (FORMAT csv, HEADER true)
+\copy payments.stg_card_limits FROM 'path\card_limits.csv' WITH (FORMAT csv, HEADER true)
+\copy payments.stg_card_security FROM 'path\card_security.csv' WITH (FORMAT csv, HEADER true)
+\copy payments.stg_merchants FROM 'path\merchants.csv' WITH (FORMAT csv, HEADER true)
+\copy payments.stg_transactions FROM 'path\transactions_clean.csv' WITH (FORMAT csv, HEADER true)
