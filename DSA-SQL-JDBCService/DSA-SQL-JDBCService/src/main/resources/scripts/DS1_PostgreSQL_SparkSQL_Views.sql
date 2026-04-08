@@ -87,7 +87,7 @@ SELECT schema_of_json('[{"txnId":1,"txnDate":"2024-01-01 10:00:00.0","clientId":
 CREATE OR REPLACE VIEW transactions_view AS
 WITH json_view AS (
     SELECT from_json(json_raw.data,
-                     'ARRAY<STRUCT<txnId: BIGINT, txnDate: STRING, clientId: BIGINT, cardId: BIGINT, amount: DOUBLE, useChip: STRING, merchantId: BIGINT, mcc: BIGINT, errors: STRING>>') array
+                     'ARRAY<STRUCT<amount: DOUBLE, cardId: BIGINT, clientId: BIGINT, errors: STRING, mcc: BIGINT, merchantId: BIGINT, txnDate: STRING, txnId: BIGINT, useChip: STRING>>') array
     FROM (SELECT java_method(
         'org.spark.service.rest.QueryRESTDataService',
         'getRESTDataDocument',

@@ -2,6 +2,7 @@
 --- DS2_PostgreSQL_JPA_SparkSQL_Views_from_REST.sql
 --------------------------------------------------------------------------------
 
+-- Vizualizare date brute din serviciul REST (Test Conexiune)
 SELECT java_method(
                'org.spark.service.rest.QueryRESTDataService',
                'getRESTDataDocument',
@@ -16,49 +17,47 @@ SELECT java_method(
 --- JPA Data Source Access Model -----------------------------------------------
 --------------------------------------------------------------------------------
 
-SELECT java_method(
-               'org.spark.service.rest.RESTEnabledSQLService',
-               'createJSONViewFromREST',
-               'CARD_JPA_JSON_VIEW',
-               'http://localhost:8091/DSA_SQL_JPAService/rest/cards/CardJpaView');
+-- 1. Get Data Source JSON Schema for Cards
+-- Se obține un exemplu de JSON pentru a genera structura SQL
+SELECT schema_of_json('[{"cardId":1,"clientId":101,"cardBrand":"VISA","cardType":"CREDIT","expires":"2027-12-31","acctOpenDate":"2022-01-01","numCardsIssued":1}]');
 
-SELECT * FROM CARD_JPA_JSON_VIEW;
-
+-- 2. Create Remote View for Cards
+-- Definirea manuală a schemei (ARRAY<STRUCT<...>>) previne erorile de sintaxă
 CREATE OR REPLACE VIEW cards_jpa_view AS
+WITH json_view AS (
+    SELECT from_json(json_raw.data,
+                     'ARRAY<STRUCT<cardId: BIGINT, clientId: BIGINT, cardBrand: STRING, cardType: STRING, expires: STRING, acctOpenDate: STRING, numCardsIssued: BIGINT>>') array
+    FROM (SELECT java_method(
+        'org.spark.service.rest.QueryRESTDataService',
+        'getRESTDataDocument',
+        'http://localhost:8091/DSA_SQL_JPAService/rest/cards/CardJpaView'
+    ) as data) json_raw
+)
 select v.*
-FROM CARD_JPA_JSON_VIEW as json_view LATERAL VIEW explode(json_view.array) AS v;
+FROM json_view LATERAL VIEW explode(json_view.array) AS v;
 
+-- 3. Test Remote View Cards
 SELECT * FROM cards_jpa_view;
 
 --------------------------------------------------------------------------------
 
-SELECT java_method(
-               'org.spark.service.rest.RESTEnabledSQLService',
-               'createJSONViewFromREST',
-               'MERCHANT_JPA_JSON_VIEW',
-               'http://localhost:8091/DSA_SQL_JPAService/rest/cards/MerchantJpaView');
+-- 1. Get Data Source JSON Schema for Merchants
+-- Necesar pentru a asigura maparea corectă a tipurilor de date [cite: 363]
+SELECT schema_of_json('[{"merchantId":10,"merchantCity":"New York","merchantState":"NY","zip":"10001"}]');
 
-SELECT * FROM MERCHANT_JPA_JSON_VIEW;
-
+-- 2. Create Remote View for Merchants
+-- Această metodă este robustă împotriva caracterelor speciale din JSON [cite: 362]
 CREATE OR REPLACE VIEW merchants_jpa_view AS
+WITH json_view AS (
+    SELECT from_json(json_raw.data,
+                     'ARRAY<STRUCT<merchantId: BIGINT, merchantCity: STRING, merchantState: STRING, zip: STRING>>') array
+    FROM (SELECT java_method(
+        'org.spark.service.rest.QueryRESTDataService',
+        'getRESTDataDocument',
+        'http://localhost:8091/DSA_SQL_JPAService/rest/cards/MerchantJpaView'
+    ) as data) json_raw
+)
 select v.*
-FROM MERCHANT_JPA_JSON_VIEW as json_view LATERAL VIEW explode(json_view.array) AS v;
-
+FROM json_view LATERAL VIEW explode(json_view.array) AS v;
+-- 3. Test Remote View Merchants
 SELECT * FROM merchants_jpa_view;
-
---------------------------------------------------------------------------------
-
--- With AUTHENTICATION examples
-SELECT java_method(
-               'org.spark.service.rest.RESTEnabledSQLService',
-               'createJSONViewFromREST',
-               'CARD_JPA_JSON_VIEW_AUTH',
-               'http://developer:iis@localhost:8091/DSA_SQL_JPAService/rest/cards/CardJpaView');
-
-SELECT * FROM CARD_JPA_JSON_VIEW_AUTH;
-
-CREATE OR REPLACE VIEW cards_jpa_view_auth AS
-select v.*
-FROM CARD_JPA_JSON_VIEW_AUTH as json_view LATERAL VIEW explode(json_view.array) AS v;
-
-SELECT * FROM cards_jpa_view_auth;
