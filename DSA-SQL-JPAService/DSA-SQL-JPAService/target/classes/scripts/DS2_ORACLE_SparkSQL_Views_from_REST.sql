@@ -1,59 +1,63 @@
-----------------------------------------------------------------------------------
---- DS2_ORACLE_SparkSQL_Views.sql
-----------------------------------------------------------------------------------
-SELECT java_method(
-               'org.spark.service.rest.QueryRESTDataService',
-               'getRESTDataDocument',
-               'http://localhost:8091/DSA_SQL_JPAService/rest/sales/SalesView');
+--------------------------------------------------------------------------------
+--- DS1_PostgreSQL_JPA_SparkSQL_Views_from_REST.sql
+--------------------------------------------------------------------------------
 
+-- Vizualizare date brute din serviciul REST (Test Conexiune)
 SELECT java_method(
                'org.spark.service.rest.QueryRESTDataService',
                'getRESTDataDocument',
-               'http://localhost:8091/DSA_SQL_JPAService/rest/sales/ProductView');
+               'http://localhost:8091/DSA_SQL_JPAService/rest/cards/CardJpaView');
 
 SELECT java_method(
                'org.spark.service.rest.QueryRESTDataService',
                'getRESTDataDocument',
-               'http://localhost:8091/DSA_SQL_JPAService/rest/sales/SalesView');
-----------------------------------------------------------------------------------
--- 1. CREATE JSON View
-SELECT java_method(
-               'org.spark.service.rest.RESTEnabledSQLService',
-               'createJSONViewFromREST',
-               'SALES_JSON_VIEW',
-               'http://localhost:8091/DSA_SQL_JPAService/rest/sales/SalesView');
+               'http://localhost:8091/DSA_SQL_JPAService/rest/cards/MerchantJpaView');
 
-SELECT * FROM SALES_JSON_VIEW;
+--------------------------------------------------------------------------------
+--- JPA Data Source Access Model -----------------------------------------------
+--------------------------------------------------------------------------------
 
--- 2. Create SQL View
--- DROP VIEW sales_view;
-CREATE OR REPLACE VIEW sales_view AS
+-- 1. Get Data Source JSON Schema for Cards
+-- Se obține un exemplu de JSON pentru a genera structura SQL
+SELECT schema_of_json('[{"cardId":1,"clientId":101,"cardBrand":"VISA","cardType":"CREDIT","expires":"2027-12-31","acctOpenDate":"2022-01-01","numCardsIssued":1}]');
+
+-- 2. Create Remote View for Cards
+-- Definirea manuală a schemei (ARRAY<STRUCT<...>>) previne erorile de sintaxă
+CREATE OR REPLACE VIEW cards_jpa_view AS
+WITH json_view AS (
+    SELECT from_json(json_raw.data,
+                     'ARRAY<STRUCT<cardId: BIGINT, clientId: BIGINT, cardBrand: STRING, cardType: STRING, expires: STRING, acctOpenDate: STRING, numCardsIssued: BIGINT>>') array
+    FROM (SELECT java_method(
+        'org.spark.service.rest.QueryRESTDataService',
+        'getRESTDataDocument',
+        'http://localhost:8091/DSA_SQL_JPAService/rest/cards/CardJpaView'
+    ) as data) json_raw
+)
 select v.*
-FROM SALES_JSON_VIEW as json_view LATERAL VIEW explode(json_view.array) AS v;
--- 3. Test Remote View
-select * FROM sales_view;
+FROM json_view LATERAL VIEW explode(json_view.array) AS v;
 
-----------------------------------------------------------------------------------
--- 1. CREATE JSON View
-SELECT java_method(
-               'org.spark.service.rest.RESTEnabledSQLService',
-               'createJSONViewFromREST',
-               'PRODUCT_JSON_VIEW',
-               'http://localhost:8091/DSA_SQL_JPAService/rest/sales/ProductView');
+-- 3. Test Remote View Cards
+SELECT * FROM cards_jpa_view;
 
-SELECT * FROM PRODUCT_JSON_VIEW;
+--------------------------------------------------------------------------------
 
--- 2. Create SQL View
--- DROP VIEW products_view;
-CREATE OR REPLACE VIEW products_view AS
+-- 1. Get Data Source JSON Schema for Merchants
+-- Necesar pentru a asigura maparea corectă a tipurilor de date [cite: 363]
+SELECT schema_of_json('[{"merchantId":10,"merchantCity":"New York","merchantState":"NY","zip":"10001"}]');
+
+-- 2. Create Remote View for Merchants
+-- Această metodă este robustă împotriva caracterelor speciale din JSON [cite: 362]
+CREATE OR REPLACE VIEW merchants_jpa_view AS
+WITH json_view AS (
+    SELECT from_json(json_raw.data,
+                     'ARRAY<STRUCT<merchantId: BIGINT, merchantCity: STRING, merchantState: STRING, zip: STRING>>') array
+    FROM (SELECT java_method(
+        'org.spark.service.rest.QueryRESTDataService',
+        'getRESTDataDocument',
+        'http://localhost:8091/DSA_SQL_JPAService/rest/cards/MerchantJpaView'
+    ) as data) json_raw
+)
 select v.*
-FROM PRODUCT_JSON_VIEW as json_view LATERAL VIEW explode(json_view.array) AS v;
--- 3. Test Remote View
-select * FROM products_view;
-
--- DROP VIEW invoices_view;
-CREATE OR REPLACE VIEW invoices_view AS
-select v.invoiceDate, v.invoiceId, v.customerId, v.customerName
-FROM SALES_JSON_VIEW as json_view LATERAL VIEW explode(json_view.array) AS v;
--- 3. Test Remote View
-select * FROM invoices_view;
+FROM json_view LATERAL VIEW explode(json_view.array) AS v;
+-- 3. Test Remote View Merchants
+SELECT * FROM merchants_jpa_view;

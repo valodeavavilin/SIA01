@@ -1,12 +1,9 @@
 package org.datasource;
 
-import org.datasource.poi.custcategories.CustomerCategoryView;
-import org.datasource.poi.custcategories.CustomerEmpCategoryViewBuilder;
-import org.datasource.poi.custcategories.CustomerTurnoverCategoryViewBuilder;
-import org.datasource.poi.periods.TimePeriodView;
-import org.datasource.poi.periods.TimePeriodViewBuilder;
-import org.datasource.poi.prodcategories.ProductCategoryHierarchyView;
-import org.datasource.poi.prodcategories.ProductCategoryHierarchyViewBuilder;
+import org.datasource.poi.customers.CustomerView;
+import org.datasource.poi.customers.CustomerViewBuilder;
+import org.datasource.poi.customerfinance.CustomerFinanceView;
+import org.datasource.poi.customerfinance.CustomerFinanceViewBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,62 +14,49 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.logging.Logger;
 
-
-/*	REST Service URL
-	http://localhost:8094/DSA-DOC-XLSService/rest/customers/CustomerTurnoverCategoryView
-	http://localhost:8094/DSA-DOC-XLSService/rest/customers/CustomerEmployeesCategoryView
-
-	http://localhost:8094/DSA-DOC-XLSService/rest/customers/TimePeriodView
-	http://localhost:8094/DSA-DOC-XLSService/rest/customers/ProductCategoryHierarchyView
+/*  REST Service URL
+    http://localhost:8094/DSA-DOC-XLSService/rest/customers/CustomerView
+    http://localhost:8094/DSA-DOC-XLSService/rest/customers/CustomerFinanceView
 */
-@RestController @RequestMapping("/customers")
+@RestController
+@RequestMapping("/customers")
 public class RESTViewServiceXLS {
-	private static Logger logger = Logger.getLogger(RESTViewServiceXLS.class.getName());
-	
-	@RequestMapping(value = "/ping", method = RequestMethod.GET,
-			produces = {MediaType.TEXT_PLAIN_VALUE})
+	private static final Logger logger = Logger.getLogger(RESTViewServiceXLS.class.getName());
+
+	@RequestMapping(
+			value = "/ping",
+			method = RequestMethod.GET,
+			produces = {MediaType.TEXT_PLAIN_VALUE}
+	)
 	@ResponseBody
 	public String pingDataSource() {
-		logger.info(">>>> REST XML Data Source is Up!");
-		return "PING response from JDBCDataSource!";
-	}
-	
-	@RequestMapping(value = "/CustomerTurnoverCategoryView", method = RequestMethod.GET,
-			produces = {MediaType.APPLICATION_JSON_VALUE, MediaType.APPLICATION_XML_VALUE})
-	@ResponseBody
-	public List<CustomerCategoryView> get_CustomerTurnoverCategoryView() throws Exception {
-		List<CustomerCategoryView> viewList = this.turnoverCategoriesViewBuilder.build().getViewList();
-		return viewList;
+		logger.info(">>>> REST XLS Data Source is Up!");
+		return "PING response from DSA-DOC-XLSService!";
 	}
 
-	@RequestMapping(value = "/CustomerEmployeesCategoryView", method = RequestMethod.GET,
-			produces = {MediaType.APPLICATION_JSON_VALUE, MediaType.APPLICATION_XML_VALUE})
+	@RequestMapping(
+			value = "/CustomerView",
+			method = RequestMethod.GET,
+			produces = {MediaType.APPLICATION_JSON_VALUE, MediaType.APPLICATION_XML_VALUE}
+	)
 	@ResponseBody
-	public List<CustomerCategoryView> get_CustomerEmployeesCategoryView() throws Exception {
-		List<CustomerCategoryView> viewList = this.employeesCategoriesViewBuilder.build().getViewList();
-		return viewList;
+	public List<CustomerView> getCustomerView() throws Exception {
+		return this.customerViewBuilder.build().getViewList();
 	}
 
-	@RequestMapping(value = "/TimePeriodView", method = RequestMethod.GET,
-			produces = {MediaType.APPLICATION_JSON_VALUE, MediaType.APPLICATION_XML_VALUE})
+	@RequestMapping(
+			value = "/CustomerFinanceView",
+			method = RequestMethod.GET,
+			produces = {MediaType.APPLICATION_JSON_VALUE, MediaType.APPLICATION_XML_VALUE}
+	)
 	@ResponseBody
-	public List<TimePeriodView> get_TimePeriodView() throws Exception {
-		List<TimePeriodView> viewList = this.timePeriodViewBuilder.build().getViewList();
-		return viewList;
+	public List<CustomerFinanceView> getCustomerFinanceView() throws Exception {
+		return this.customerFinanceViewBuilder.build().getViewList();
 	}
 
-	@RequestMapping(value = "/ProductCategoryHierarchyView", method = RequestMethod.GET,
-			produces = {MediaType.APPLICATION_JSON_VALUE, MediaType.APPLICATION_XML_VALUE})
-	@ResponseBody
-	public List<ProductCategoryHierarchyView> get_ProductCategoryHierarchyView() throws Exception {
-		System.out.println( "RESTViewServiceXLS::get_CustomerCategoryHierarchyView()");
-		List<ProductCategoryHierarchyView> viewList = this.productCategoryHierarchyViewBuilder.build().getViewList();
-		return viewList;
-	}
+	@Autowired
+	private CustomerViewBuilder customerViewBuilder;
 
-	// Set-up
-	@Autowired private CustomerTurnoverCategoryViewBuilder turnoverCategoriesViewBuilder;
-	@Autowired private CustomerEmpCategoryViewBuilder employeesCategoriesViewBuilder;
-	@Autowired private TimePeriodViewBuilder timePeriodViewBuilder;
-	@Autowired private ProductCategoryHierarchyViewBuilder productCategoryHierarchyViewBuilder;
+	@Autowired
+	private CustomerFinanceViewBuilder customerFinanceViewBuilder;
 }

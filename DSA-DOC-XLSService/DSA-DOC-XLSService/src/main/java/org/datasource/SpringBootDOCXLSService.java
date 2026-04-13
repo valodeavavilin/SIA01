@@ -10,7 +10,7 @@ import java.util.logging.Logger;
 
 
 /*
- * java -jar DSA-DOC-XLSService-2025.1.jar --xlsx.data.source.file.path=/home/catalin/data/CustProdCateg.xlsx
+ * java -jar DSA-DOC-XLSService-2025.1.jar --xlsx.data.source.file.path=C:\fdbo_data\crm.xlsx
  */
 @SpringBootApplication (exclude={DataSourceAutoConfiguration.class} )
 public class SpringBootDOCXLSService extends SpringBootServletInitializer {
