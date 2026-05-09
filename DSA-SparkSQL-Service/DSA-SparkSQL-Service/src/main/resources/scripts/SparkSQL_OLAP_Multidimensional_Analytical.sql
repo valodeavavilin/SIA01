@@ -1522,13 +1522,134 @@ ORDER BY
 
 SELECT * FROM WV_CREDIT_MONTH_PERFORMANCE_V LIMIT 50;
 
+--------------------------------------------------------------------------------
+--- 6. ADVANCED ANALYTICAL VIEWS ------------------------------------------------
+--- Additional advanced SparkSQL analytical views:
+---   6.1 PIVOT analysis
+---   6.2 Percentile / distribution analysis
+---   6.3 Statistical and correlation analysis
+--------------------------------------------------------------------------------
+
 
 --------------------------------------------------------------------------------
---- 6. FINAL VALIDATION -------------------------------------------------
+--- 6.1 Advanced PIVOT View
+--- Monthly transaction amount by source system
+--------------------------------------------------------------------------------
+
+CREATE OR REPLACE VIEW ADV_PIVOT_TXN_SOURCE_MONTH_V AS
+SELECT
+    txn_year,
+    txn_month,
+    COALESCE(`POSTGRES`, 0) AS postgres_total_amount,
+    COALESCE(`MONGO`, 0)    AS mongo_total_amount,
+    COALESCE(`POSTGRES`, 0) + COALESCE(`MONGO`, 0) AS total_amount
+FROM (
+    SELECT
+        t.txn_year,
+        t.txn_month,
+        f.source_system,
+        f.amount
+    FROM FACT_TRANSACTIONS_V f
+    INNER JOIN DIM_TIME_V t
+        ON f.txn_date = t.txn_date
+) src
+PIVOT (
+    SUM(amount)
+    FOR source_system IN (
+        'POSTGRES' AS POSTGRES,
+        'MONGO'    AS MONGO
+    )
+)
+ORDER BY
+    txn_year,
+    txn_month;
+
+SELECT * FROM ADV_PIVOT_TXN_SOURCE_MONTH_V;
+
+
+--------------------------------------------------------------------------------
+--- 6.2 Advanced Transaction Amount Distribution View
+--- Percentile and distribution analysis by source system and card brand
+--------------------------------------------------------------------------------
+
+CREATE OR REPLACE VIEW ADV_TXN_AMOUNT_DISTRIBUTION_V AS
+SELECT
+    f.source_system,
+    COALESCE(c.card_brand, 'UNKNOWN_BRAND') AS card_brand,
+
+    COUNT(f.txn_id) AS txn_count,
+
+    ROUND(SUM(COALESCE(f.amount, 0)), 2) AS total_amount,
+    ROUND(AVG(f.amount), 2) AS avg_amount,
+    ROUND(MIN(f.amount), 2) AS min_amount,
+    ROUND(MAX(f.amount), 2) AS max_amount,
+
+    ROUND(percentile_approx(f.amount, 0.25), 2) AS q1_amount,
+    ROUND(percentile_approx(f.amount, 0.50), 2) AS median_amount,
+    ROUND(percentile_approx(f.amount, 0.75), 2) AS q3_amount,
+
+    ROUND(STDDEV(f.amount), 2) AS stddev_amount
+
+FROM FACT_TRANSACTIONS_V f
+LEFT JOIN DIM_CARD_V c
+    ON f.card_id = c.card_id
+GROUP BY
+    f.source_system,
+    COALESCE(c.card_brand, 'UNKNOWN_BRAND')
+ORDER BY
+    f.source_system,
+    card_brand;
+
+SELECT * FROM ADV_TXN_AMOUNT_DISTRIBUTION_V;
+
+
+--------------------------------------------------------------------------------
+--- 6.3 Advanced Statistical and Correlation View
+--- Statistical profile of transactions by source system
+--------------------------------------------------------------------------------
+
+CREATE OR REPLACE VIEW ADV_TXN_RISK_STATISTICS_V AS
+SELECT
+    f.source_system,
+
+    COUNT(f.txn_id) AS txn_count,
+
+    ROUND(SUM(COALESCE(f.amount, 0)), 2) AS total_amount,
+    ROUND(AVG(COALESCE(f.amount, 0)), 2) AS avg_amount,
+    ROUND(MIN(f.amount), 2) AS min_amount,
+    ROUND(MAX(f.amount), 2) AS max_amount,
+
+    ROUND(VARIANCE(f.amount), 2) AS amount_variance_sample,
+    ROUND(VAR_POP(f.amount), 2) AS amount_variance_population,
+    ROUND(STDDEV(f.amount), 2) AS amount_stddev_sample,
+    ROUND(STDDEV_POP(f.amount), 2) AS amount_stddev_population,
+
+    ROUND(CORR(CAST(c.credit_score AS DOUBLE), f.amount), 4)
+        AS corr_credit_score_amount,
+
+    ROUND(CORR(CAST(c.yearly_income AS DOUBLE), f.amount), 4)
+        AS corr_yearly_income_amount,
+
+    ROUND(CORR(CAST(c.total_debt AS DOUBLE), f.amount), 4)
+        AS corr_total_debt_amount
+
+FROM FACT_TRANSACTIONS_V f
+LEFT JOIN DIM_CLIENT_V c
+    ON f.client_id = c.client_id
+GROUP BY
+    f.source_system
+ORDER BY
+    f.source_system;
+
+SELECT * FROM ADV_TXN_RISK_STATISTICS_V;
+
+
+--------------------------------------------------------------------------------
+--- 7. FINAL VALIDATION -------------------------------------------------
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
---- 6.1 View existence - Integration, Facts, Dimensions
+--- 7.1 View existence - Integration, Facts, Dimensions
 --------------------------------------------------------------------------------
 
 SELECT COUNT(*) AS cnt FROM INT_CUSTOMER_PROFILE_V;
@@ -1543,7 +1664,7 @@ SELECT COUNT(*) AS cnt FROM FACT_TRANSACTIONS_ENRICHED_V;
 
 
 --------------------------------------------------------------------------------
---- 6.2 Transactions by source
+--- 7.2 Transactions by source
 --------------------------------------------------------------------------------
 
 SELECT
@@ -1556,7 +1677,7 @@ ORDER BY source_system;
 
 
 --------------------------------------------------------------------------------
---- 6.3 Distinct days per month
+--- 7.3 Distinct days per month
 --------------------------------------------------------------------------------
 
 SELECT
@@ -1569,7 +1690,7 @@ ORDER BY txn_year, txn_month;
 
 
 --------------------------------------------------------------------------------
---- 6.4 Transactions per month
+--- 7.4 Transactions per month
 --------------------------------------------------------------------------------
 
 SELECT
@@ -1583,7 +1704,7 @@ ORDER BY txn_year, txn_month;
 
 
 --------------------------------------------------------------------------------
---- 6.5 Transactions per month and source system
+--- 7.5 Transactions per month and source system
 --------------------------------------------------------------------------------
 
 SELECT
@@ -1598,11 +1719,11 @@ ORDER BY txn_year, txn_month, source_system;
 
 
 --------------------------------------------------------------------------------
---- 7. COMPLETE VIEW LIST -------------------------------------------------------
+--- 8. COMPLETE VIEW LIST -------------------------------------------------------
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
---- 7.1 Source / Remote SparkSQL Views
+--- 8.1 Source / Remote SparkSQL Views
 --------------------------------------------------------------------------------
 
 -- card_limits_view
@@ -1619,7 +1740,7 @@ ORDER BY txn_year, txn_month, source_system;
 
 
 --------------------------------------------------------------------------------
---- 7.2 Integration Views
+--- 8.2 Integration Views
 --------------------------------------------------------------------------------
 
 -- INT_CUSTOMER_PROFILE_V
@@ -1628,7 +1749,7 @@ ORDER BY txn_year, txn_month, source_system;
 
 
 --------------------------------------------------------------------------------
---- 7.3 Dimensional Views
+--- 8.3 Dimensional Views
 --------------------------------------------------------------------------------
 
 -- DIM_CLIENT_V
@@ -1638,7 +1759,7 @@ ORDER BY txn_year, txn_month, source_system;
 
 
 --------------------------------------------------------------------------------
---- 7.4 Fact Views
+--- 8.4 Fact Views
 --------------------------------------------------------------------------------
 
 -- FACT_TRANSACTIONS_V
@@ -1646,7 +1767,7 @@ ORDER BY txn_year, txn_month, source_system;
 
 
 --------------------------------------------------------------------------------
---- 7.5 OLAP Analytical Views
+--- 8.5 OLAP Analytical Views
 --------------------------------------------------------------------------------
 
 -- OLAP_VIEW_TXN_CALENDAR_V
@@ -1662,7 +1783,7 @@ ORDER BY txn_year, txn_month, source_system;
 
 
 --------------------------------------------------------------------------------
---- 7.6 Window Analytical Views
+--- 8.6 Window Analytical Views
 --------------------------------------------------------------------------------
 
 -- WV_TXN_RUNNING_TOTAL_CLIENT_V
@@ -1673,9 +1794,15 @@ ORDER BY txn_year, txn_month, source_system;
 -- WV_MERCHANT_STATE_RANK_V
 -- WV_CREDIT_MONTH_PERFORMANCE_V
 
-
 --------------------------------------------------------------------------------
---- 8. SPARKSQL REST ENDPOINT TBD ------------------------------------------
+--- 8.7 Advanced View List ------------------------------------------------------
+--------------------------------------------------------------------------------
+
+-- ADV_PIVOT_TXN_SOURCE_MONTH_V
+-- ADV_TXN_AMOUNT_DISTRIBUTION_V
+-- ADV_TXN_RISK_STATISTICS_V
+--------------------------------------------------------------------------------
+--- 9. SPARKSQL REST ENDPOINTS ------------------------------------------
 --------------------------------------------------------------------------------
 
 -- http://localhost:9990/DSA-SparkSQL-Service/rest/view/OLAP_VIEW_TXN_CALENDAR_V
@@ -1695,3 +1822,6 @@ ORDER BY txn_year, txn_month, source_system;
 -- http://localhost:9990/DSA-SparkSQL-Service/rest/view/WV_TXN_CLIENT_FIRST_LAST_TOP_V
 -- http://localhost:9990/DSA-SparkSQL-Service/rest/view/WV_MERCHANT_STATE_RANK_V
 -- http://localhost:9990/DSA-SparkSQL-Service/rest/view/WV_CREDIT_MONTH_PERFORMANCE_V
+-- http://localhost:9990/DSA-SparkSQL-Service/rest/view/ADV_PIVOT_TXN_SOURCE_MONTH_V
+-- http://localhost:9990/DSA-SparkSQL-Service/rest/view/ADV_TXN_AMOUNT_DISTRIBUTION_V
+-- http://localhost:9990/DSA-SparkSQL-Service/rest/view/ADV_TXN_RISK_STATISTICS_V
