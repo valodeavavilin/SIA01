@@ -23,19 +23,17 @@ public class SparkSQLService {
     * https://spark.apache.org/docs/latest/sql-distributed-sql-engine.html
     *
      */
-    private void startThriftServer2(){
-        // Create a SparkSession with Hive support
+    private void startThriftServer2() {
+        logger.info(">>> HiveThriftServer2 Starting ....");
+
         this.spark = SparkSession.builder()
                 .master("local[*]")
-                .appName("SparkThriftServer")
+                .config("spark.ui.port", "8081")
+                .appName("SparkSQL-REST.Server")
                 .enableHiveSupport()
-                //.config("spark.sql.hive.thriftServer.singleSession", true)
                 .config("hive.server2.thrift.port", "10000")
-                //.config("spark.hadoop.hadoop.native.lib","false")
-                //ENV: HADOOP_PATH=C:\hadoop
                 .getOrCreate();
 
-        // Start the Thrift server
         HiveThriftServer2.startWithContext(spark.sqlContext());
 
         logger.info(">>> HiveThriftServer2 started successfully!");

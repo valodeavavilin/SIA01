@@ -14,11 +14,15 @@ public class SprinBootSparkSQLStarter extends SpringBootServletInitializer
     {
         private static Logger logger = Logger.getLogger(SprinBootSparkSQLStarter.class.getName());
 
-        public static void main(String[] args) {
+        public static void main(String[] args) throws Exception {
             logger.info("Loading ... SparkStarterService with Spark Default Settings ... DSA");
             SpringApplication.run(SprinBootSparkSQLStarter.class, args);
         }
 
 }
 
-//java --add-opens java.base/sun.nio.ch=ALL-UNNAMED --add-opens java.base/java.io=ALL-UNNAMED
+// hive-exec:2.3.10 incompatibility with JDK21
+// Fix: --add-opens=java.base/java.net=ALL-UNNAMED --add-opens=java.base/sun.util.calendar=ALL-UNNAMED
+
+// java -jar target/DSA-SparkSQL-Service-2026.1.jar
+// java --add-opens java.base/java.net=ALL-UNNAMED -jar target/DSA-SparkSQL-Service-2026.1.jar

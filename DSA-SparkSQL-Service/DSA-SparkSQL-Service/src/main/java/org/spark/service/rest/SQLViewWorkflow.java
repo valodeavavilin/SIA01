@@ -120,6 +120,7 @@ public class SQLViewWorkflow {
             logger.info("DEBUG: query result: ");
             sqlDataSet.show();
             sqlResults = sqlDataSet.toJSON().collectAsList().toString();
+            logger.info("DEBUG: query result string:\n " + sqlResults + "\n");
         } catch (Exception e) {
             throw new RESTSQLWorkflowException("STEP_1: SQL Execution Error for: ["
                     + SQLQuery + "]\n"
