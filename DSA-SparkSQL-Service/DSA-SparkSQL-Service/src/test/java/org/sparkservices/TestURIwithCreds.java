@@ -3,23 +3,56 @@ package org.sparkservices;
 import org.junit.jupiter.api.Test;
 import org.spark.service.rest.QueryRESTDataService;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 public class TestURIwithCreds {
+
     @Test
-    public void testCredentials() {
-        String urlString = "http://localhost:8090/DSA-SQL-JDBCService/rest/customers/CustomerView";
-        QueryRESTDataService.parseCredentials(urlString);
-        urlString = "http://developer:iis@localhost:8090/DSA-SQL-JDBCService/rest/customers/CustomerView";
-        QueryRESTDataService.parseCredentials(urlString);
-        urlString = "12345";
-        QueryRESTDataService.parseCredentials(urlString);
+    public void testUrlWithoutCredentialsReturnsNull() {
+        String urlString = "http://localhost:8090/DSA-SQL-PostgreSQLService/rest/payments/TransactionsView";
+
+        String[] credentials = assertDoesNotThrow(
+                () -> QueryRESTDataService.parseCredentials(urlString)
+        );
+
+        assertNull(credentials);
     }
 
     @Test
-    public void testCredentials2() {
-        String urlString = "http://developer:iis@localhost:8090/DSA-SQL-JDBCService/rest/customers/CustomerView";
-        System.out.println(urlString);
+    public void testUrlWithCredentialsExtractsUsernameAndPassword() {
+        String urlString = "http://developer:iis@localhost:8090/DSA-SQL-PostgreSQLService/rest/payments/TransactionsView";
+
         String[] credentials = QueryRESTDataService.parseCredentials(urlString);
-        urlString = urlString.replace(credentials[0] + ":" + credentials[1] + "@", "");
-        System.out.println(urlString);
+
+        assertNotNull(credentials);
+        assertEquals("developer", credentials[0]);
+        assertEquals("iis", credentials[1]);
+    }
+
+    @Test
+    public void testUrlWithCredentialsCanBeCleaned() {
+        String urlString = "http://developer:iis@localhost:8090/DSA-SQL-PostgreSQLService/rest/payments/TransactionsView";
+
+        String[] credentials = QueryRESTDataService.parseCredentials(urlString);
+
+        assertNotNull(credentials);
+
+        String cleanUrl = urlString.replace(credentials[0] + ":" + credentials[1] + "@", "");
+
+        assertEquals(
+                "http://localhost:8090/DSA-SQL-PostgreSQLService/rest/payments/TransactionsView",
+                cleanUrl
+        );
+    }
+
+    @Test
+    public void testInvalidUrlDoesNotCrashAndReturnsNull() {
+        String urlString = "12345";
+
+        String[] credentials = assertDoesNotThrow(
+                () -> QueryRESTDataService.parseCredentials(urlString)
+        );
+
+        assertNull(credentials);
     }
 }
